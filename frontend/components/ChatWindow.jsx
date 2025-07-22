@@ -101,7 +101,7 @@ export default function ChatWindow({
                         <div className="flex-1 relative">
                             <textarea
                                 ref={inputRef}
-                                className="w-full resize-none border border-gray-300 rounded-lg px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                className="w-full resize-none border border-gray-300 rounded-lg px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-700"
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={handleKeyDown}
@@ -119,8 +119,8 @@ export default function ChatWindow({
                             <button
                                 type="submit"
                                 className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-2 rounded-lg transition-all duration-200 ${input.trim() && !streaming
-                                        ? 'text-blue-600 hover:bg-blue-50'
-                                        : 'text-gray-400 cursor-not-allowed'
+                                    ? 'text-blue-600 hover:bg-blue-50'
+                                    : 'text-gray-400 cursor-not-allowed'
                                     }`}
                                 disabled={!input.trim() || streaming}
                             >
