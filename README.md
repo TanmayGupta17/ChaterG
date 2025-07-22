@@ -50,3 +50,5 @@ This project showcases a frontend-driven chat application that allows users to c
    npm install
    npm start
    ```
+4. Database
+   
