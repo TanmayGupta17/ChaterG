@@ -1,103 +1,262 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect, useRef } from 'react';
+import ChatSidebar from '../components/ChatSidebar';
+import ChatWindow from '../components/ChatWindow';
+
+function deduplicateText(text) {
+  let result = text.replace(/\b(\w+)( \1\b)+/gi, '$1');
+  result = result.replace(/\b(\w+?)\1+\b/gi, '$1');
+
+  return result;
+}
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [chats, setChats] = useState([]);
+  const [selectedChatId, setSelectedChatId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [streaming, setStreaming] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const abortControllerRef = useRef(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+  // API Base URL
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+
+  // Inline API Functions
+  const fetchChats = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/chat/allchats`);
+      if (!res.ok) throw new Error('Failed to fetch chats');
+      return await res.json();
+    } catch (error) {
+      console.error('Error fetching chats:', error);
+      return [];
+    }
+  };
+
+  const fetchChat = async (chatId) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/chat/${chatId}`);
+      if (!res.ok) throw new Error('Failed to fetch chat');
+      return await res.json();
+    } catch (error) {
+      console.error('Error fetching chat:', error);
+      return { messages: [] };
+    }
+  };
+
+  const createChat = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      if (!res.ok) throw new Error('Failed to create chat');
+      return await res.json();
+    } catch (error) {
+      console.error('Error creating chat:', error);
+      throw error;
+    }
+  };
+
+  const sendMessage = async (chatId, message, onToken, signal) => {
+    try {
+      const response = await fetch(`${API_BASE}/api/chat/${chatId}/message`, {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        signal: signal
+      });
+
+      if (!response.ok) throw new Error('Failed to send message');
+      if (!response.body) throw new Error('No response stream');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      let done = false;
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        if (value) {
+          const chunk = decoder.decode(value);
+          onToken(chunk);
+        }
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Request aborted');
+      } else {
+        console.error('Error sending message:', error);
+        throw error;
+      }
+    }
+  };
+
+  const stopChat = async (chatId) => {
+    try {
+      await fetch(`${API_BASE}/api/chat/${chatId}/stop`, {
+        method: 'POST'
+      });
+    } catch (error) {
+      console.error('Error stopping chat:', error);
+    }
+  };
+
+  // Load chats on component mount
+  useEffect(() => {
+    loadChats();
+  }, []);
+
+  // Load messages when chat is selected
+  useEffect(() => {
+    if (selectedChatId) {
+      loadChatMessages(selectedChatId);
+    } else {
+      setMessages([]);
+    }
+  }, [selectedChatId]);
+
+  const loadChats = async () => {
+    try {
+      setLoading(true);
+      const chatList = await fetchChats();
+      setChats(chatList);
+    } catch (error) {
+      console.error('Failed to load chats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadChatMessages = async (chatId) => {
+    try {
+      const chatData = await fetchChat(chatId);
+      setMessages(chatData.messages || []);
+    } catch (error) {
+      console.error('Failed to load chat messages:', error);
+      setMessages([]);
+    }
+  };
+
+  const handleSelectChat = (chatId) => {
+    if (streaming) {
+      handleStopGeneration();
+    }
+    setSelectedChatId(chatId);
+  };
+
+  const handleNewChat = async () => {
+    try {
+      if (streaming) {
+        handleStopGeneration();
+      }
+
+      const newChat = await createChat();
+      setChats(prev => [newChat, ...prev]);
+      setSelectedChatId(newChat.id);
+      setMessages([]);
+    } catch (error) {
+      console.error('Failed to create new chat:', error);
+      alert('Failed to create new chat. Please try again.');
+    }
+  };
+
+  const handleSendMessage = async (messageText) => {
+    if (!selectedChatId || streaming) return;
+
+    const userMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: messageText,
+      timestamp: new Date().toISOString()
+    };
+
+    const assistantMessage = {
+      id: `assistant-${Date.now()}`,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date().toISOString()
+    };
+
+    setMessages(prev => [...prev, userMessage, assistantMessage]);
+    setStreaming(true);
+
+    // Create abort controller for this request
+    abortControllerRef.current = new AbortController();
+
+    try {
+      await sendMessage(
+        selectedChatId,
+        messageText,
+        (token) => {
+          setMessages(prev => {
+            const newMessages = [...prev];
+            const lastMessage = newMessages[newMessages.length - 1];
+            if (lastMessage && lastMessage.role === 'assistant') {
+              const updated = lastMessage.content + token;
+              lastMessage.content = deduplicateText(updated);
+            }
+            return newMessages;
+          });
+        },
+        abortControllerRef.current.signal
+      );
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error('Failed to send message:', error);
+        // Remove the assistant message on error
+        setMessages(prev => prev.slice(0, -1));
+        alert('Failed to send message. Please try again.');
+      }
+    } finally {
+      setStreaming(false);
+      abortControllerRef.current = null;
+      // Refresh chat list to get updated titles
+      loadChats();
+    }
+  };
+
+  const handleStopGeneration = async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    if (selectedChatId) {
+      await stopChat(selectedChatId);
+    }
+
+    setStreaming(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-screen bg-gray-100">
+      <ChatSidebar
+        chats={chats}
+        onSelect={handleSelectChat}
+        onNewChat={handleNewChat}
+        selectedId={selectedChatId}
+      />
+      <main className="flex-1 flex flex-col">
+        <ChatWindow
+          messages={messages}
+          onSend={handleSendMessage}
+          onStop={handleStopGeneration}
+          streaming={streaming}
+          selectedChatId={selectedChatId}
+        />
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }

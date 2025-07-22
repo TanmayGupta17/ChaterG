@@ -7,31 +7,34 @@ const cors = require('cors');
 
 //Routes
 const userRoutes = require('./routes/user');
+const chatRoutes = require('./routes/chat');
+
+// Middleware
+const checkForAuthentication = require('./middleware/checkforAuthentication');
 
 app.use(express.json());
 app.get('/', (req, res) => {
     res.send('ChaterG Server is up and running');
 });
 
-app.use(cors());
+app.use(cors({
+    origin: true,
+    credentials: true
+}));
 
 app.use('/user', userRoutes);
-app.post('/chat', async (req, res) => {
-    const { prompt } = req.body;
+app.use('/api/chat', chatRoutes);
+// Root endpoint for health
+app.get('/chat', async (req, res) => {
+    const pool = require('./db');
     try {
-        const response = await axios.post('http://localhost:11434/api/generate', {
-            model: 'gemma',
-            prompt: prompt,
-            stream: false
-        });
-
-        res.json({ response: response.data });
+        const result = await pool.query('SELECT id, title FROM chats ORDER BY created_at DESC');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Failed to fetch chat list:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-    catch (error) {
-        console.error('Error in /chat route:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-})
+});
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
