@@ -18,10 +18,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const abortControllerRef = useRef(null);
 
-  // API Base URL
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
 
-  // Inline API Functions
   const fetchChats = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/chat/allchats`);
@@ -149,30 +147,6 @@ export default function Home() {
     }
   };
 
-  // const handleNewChat = async () => {
-  //   try {
-  //     if (streaming) handleStopGeneration();
-
-  //     const newChat = await createChat();
-
-  //     const safeChat = {
-  //       id: newChat.id,
-  //       createdAt: newChat.createdAt || new Date().toISOString(),
-  //       messages: [],
-  //     };
-
-  //     setChats(prev => [safeChat, ...prev]);
-
-  //     // ✅ Preload empty messages so it doesn't feel broken
-  //     setTimeout(() => {
-  //       setSelectedChatId(safeChat.id);
-  //     }, 500);
-  //     setMessages([]);
-  //   } catch (error) {
-  //     console.error('Failed to create new chat:', error);
-  //   }
-  // };
-
   const handleNewChat = async () => {
     try {
       if (streaming) handleStopGeneration();
@@ -184,9 +158,6 @@ export default function Home() {
       console.error("Error creating new chat:", err);
     }
   };
-
-
-
 
   const handleSendMessage = async (messageText) => {
     if (!selectedChatId || streaming) return;
@@ -208,7 +179,6 @@ export default function Home() {
     setMessages(prev => [...prev, userMessage, assistantMessage]);
     setStreaming(true);
 
-    // Create abort controller for this request
     abortControllerRef.current = new AbortController();
 
     try {
@@ -231,14 +201,12 @@ export default function Home() {
     } catch (error) {
       if (error.name !== 'AbortError') {
         console.error('Failed to send message:', error);
-        // Remove the assistant message on error
         setMessages(prev => prev.slice(0, -1));
         alert('Failed to send message. Please try again.');
       }
     } finally {
       setStreaming(false);
       abortControllerRef.current = null;
-      // Refresh chat list to get updated titles
       loadChats();
     }
   };
