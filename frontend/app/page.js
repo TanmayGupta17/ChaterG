@@ -120,6 +120,7 @@ export default function Home() {
     }
   }, [selectedChatId]);
 
+
   const loadChats = async () => {
     try {
       setLoading(true);
@@ -143,27 +144,49 @@ export default function Home() {
   };
 
   const handleSelectChat = (chatId) => {
-    if (streaming) {
-      handleStopGeneration();
+    if (chatId !== selectedChatId) {
+      setSelectedChatId(chatId);
     }
-    setSelectedChatId(chatId);
   };
+
+  // const handleNewChat = async () => {
+  //   try {
+  //     if (streaming) handleStopGeneration();
+
+  //     const newChat = await createChat();
+
+  //     const safeChat = {
+  //       id: newChat.id,
+  //       createdAt: newChat.createdAt || new Date().toISOString(),
+  //       messages: [],
+  //     };
+
+  //     setChats(prev => [safeChat, ...prev]);
+
+  //     // ✅ Preload empty messages so it doesn't feel broken
+  //     setTimeout(() => {
+  //       setSelectedChatId(safeChat.id);
+  //     }, 500);
+  //     setMessages([]);
+  //   } catch (error) {
+  //     console.error('Failed to create new chat:', error);
+  //   }
+  // };
 
   const handleNewChat = async () => {
     try {
-      if (streaming) {
-        handleStopGeneration();
-      }
-
+      if (streaming) handleStopGeneration();
       const newChat = await createChat();
-      setChats(prev => [newChat, ...prev]);
+      await loadChats();  // refreshes sidebar
       setSelectedChatId(newChat.id);
       setMessages([]);
-    } catch (error) {
-      console.error('Failed to create new chat:', error);
-      alert('Failed to create new chat. Please try again.');
+    } catch (err) {
+      console.error("Error creating new chat:", err);
     }
   };
+
+
+
 
   const handleSendMessage = async (messageText) => {
     if (!selectedChatId || streaming) return;

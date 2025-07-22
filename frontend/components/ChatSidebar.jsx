@@ -10,26 +10,28 @@ export default function ChatSidebar({
     const [isCollapsed, setIsCollapsed] = useState(false);
 
     const formatChatTitle = (chat) => {
-        console.log("Formatting chat title:", chat);
         if (!chat) return "Untitled";
         if (chat.title) return chat.title;
-        // if (chat.id) return `Chat ${chat.id.slice(0, 8)}`;
+        if (chat.messages && chat.messages.length > 0) {
+            return chat.messages[0]?.content?.slice(0, 20) || "Untitled";
+        }
         return "Untitled";
     };
 
 
     const formatDate = (dateString) => {
+        if (!dateString) return "Just now";
         const date = new Date(dateString);
-        console.log("Formatting date:", date);
+        if (isNaN(date)) return "Just now";
+
         const now = new Date();
-        console.log("Current date:", now);
         const diffTime = Math.abs(now - date);
-        console.log("Time difference in milliseconds:", diffTime);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        console.log("Difference in days:", diffDays);
-        if (diffDays === 1) return 'Today';
-        if (diffDays === 2) return 'Yesterday';
-        if (diffDays <= 7) return `${diffDays} days ago`;
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return `${diffDays} days ago`;
+
         return date.toLocaleDateString();
     };
 
@@ -79,9 +81,9 @@ export default function ChatSidebar({
                         No chats yet. Start a new conversation!
                     </div>
                 ) : (
-                    chats.map((chat) => (
+                    chats.map((chat, index) => (
                         <div
-                            key={chat.id}
+                            key={chat.id || `chat-${index}`}
                             className={`${selectedId === chat.id
                                 ? 'bg-blue-100 border-blue-200 text-blue-900'
                                 : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
